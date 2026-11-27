@@ -1,0 +1,17 @@
+[Unit]
+Description=SPT 4.1.6 server
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/spt
+ExecStart=%h/spt/SPT.Server.Linux
+Environment=DOTNET_ROOT=%h/.dotnet
+Environment=DOTNET_ROLL_FORWARD=Minor
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

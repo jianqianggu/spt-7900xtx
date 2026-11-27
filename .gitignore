@@ -1,0 +1,12 @@
+# This repository is the public connect page only.
+# Never commit a game install, a profile, a key, or a server config.
+user/
+profiles/
+*.7z
+http.json
+fika.jsonc
+*.key
+*.pem
+*.pfx
+.env
+.secrets

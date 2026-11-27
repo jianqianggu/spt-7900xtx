@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPT server — connect and bring your profile</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Iowan Old Style", Palatino, serif;
+      background: #16140f;
+      color: #f3ead7;
+      line-height: 1.55;
+    }
+    main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    h1, h2 { font-weight: 600; line-height: 1.2; }
+    h1 { font-size: 2rem; margin-bottom: 0.4rem; }
+    h2 { font-size: 1.25rem; margin-top: 2.2rem; }
+    p, li { font-size: 1.05rem; }
+    a { color: #f0c36a; }
+    code, .addr {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95rem;
+    }
+    .addr {
+      display: block;
+      margin: 0.4rem 0 0.8rem;
+      padding: 0.7rem 0.85rem;
+      background: #241f16;
+      border: 1px solid #6b5428;
+      border-radius: 6px;
+      color: #ffe7ad;
+    }
+    .note {
+      padding: 0.85rem 1rem;
+      background: #2a2218;
+      border-left: 4px solid #c9842a;
+    }
+    ol li, ul li { margin: 0.35rem 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SPT server</h1>
+    <p>Shared SPT 4.1.6 server for invited players. Bring the profile you already play, then join from the SPT launcher.</p>
+
+    <h2>What you need installed</h2>
+    <ul>
+      <li>Escape from Tarkov <code>0.16.9.5.40743</code></li>
+      <li>SPT <code>4.1.6</code></li>
+      <li>Fika client <code>2.4.2</code>, the same co-op mod the server is running</li>
+      <li>The client plugins listed below, at the same versions</li>
+    </ul>
+
+    <h2>Connect</h2>
+    <p>In the SPT launcher, add a server and use one of these addresses. The launcher connects with HTTPS. The first time you connect, accept the server certificate. Use the first address if you were invited on Tailscale. Use the second only when your PC is on the same home network as the server.</p>
+    <p>Tailscale</p>
+    <span class="addr">jianq-7900xtx.tail4219b.ts.net:6969</span>
+    <p>Same home network</p>
+    <span class="addr">192.168.0.12:6969</span>
+    <p class="note">There is no public internet address. A Tailscale invite comes from the server admin in private. This page is not an invite, and it does not accept uploads.</p>
+
+    <h2>Bring your own profile</h2>
+    <ol>
+      <li>Install the SPT version and client mods on this page. Start your own SPT once so the profile is saved, then close your local server and the game.</li>
+      <li>Open <code>SPT/user/profiles</code> on your PC. Copy the single JSON file whose name matches your profile. Leave every other file there, including other people's profiles and the <code>backups</code> folder.</li>
+      <li>Hand that one file to the server admin in private. A GitHub issue, a pull request, or a comment on this page is the wrong place for it.</li>
+      <li>The admin imports it on the server. The importer accepts one profile at a time, checks that the file name matches the profile id, and refuses a file that would take someone else's username.</li>
+      <li>Open the launcher, select this server, and log in with the same username. SPT 4.1 identifies a profile by username, so keep that name private.</li>
+    </ol>
+    <p>After the profile is on the server, play it here only. Running the same profile on your own server at the same time will split your progress.</p>
+
+    <h2>Client mods to install</h2>
+    <p>These are the BepInEx plugins that match this server. Server-only mods already run on the host.</p>
+    <ul>
+      <li>Fika 2.4.2</li>
+      <li>SAIN 4.5.1</li>
+      <li>Looting Bots 1.8.1</li>
+      <li>Dynamic Maps 1.2.1</li>
+      <li>Borkel's Realistic Night Vision Goggles 2.2.0</li>
+      <li>WTT Armory 2.0.5 and WTT Content Backport 2.0.2, plus their client libraries</li>
+      <li>UI Fixes 6.0.2 and Weapon Customizer 4.0.0</li>
+      <li>Better Keys 1.8.0, Gilded Key Storage 2.1.1, Barter Item Stacks 1.4.3</li>
+      <li>Epic's All In One 5.0.1, if you use its client features</li>
+    </ul>
+
+    <h2>How access is limited</h2>
+    <ul>
+      <li>The game port is for Tailscale members and the home LAN. It is not published to the internet from this setup.</li>
+      <li>The server web admin login is a separate password, works from the server itself, and is not written on this page.</li>
+      <li>Profile files, server configs, and API keys stay off this website.</li>
+      <li>An imported profile cannot overwrite a different person's username.</li>
+    </ul>
+  </main>
+</body>
+</html>
