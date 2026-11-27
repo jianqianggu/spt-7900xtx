@@ -3,6 +3,7 @@
 user/
 profiles/
 *.7z
+*.zip
 http.json
 fika.jsonc
 *.key

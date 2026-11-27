@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Accept one SPT profile upload and reload the game server.
+"""Accept one SPT profile upload, report status, and serve the client mod pack.
 
-The listener binds to the Tailscale address only. Browsers must come from the
-public connect page and send the SPTProfileImport header, which blocks another
-website from submitting a profile through a player's browser.
+The listener binds to the Tailscale address only. Profile import, status, and
+profile download must come from the public connect page and send the
+SPTProfileImport header, which blocks another website from using a player's
+browser. The mod pack is a direct download on that same Tailscale address.
 """
 
 from __future__ import annotations
@@ -35,6 +36,8 @@ SKIP_RELOAD = os.environ.get("SPT_SKIP_RELOAD") == "1"
 DEPS_FILE = Path(os.environ.get("SPT_DEPS_FILE", "/home/jianqianggu/spt/SPT.Server.deps.json"))
 SPT_PORT = int(os.environ.get("SPT_GAME_PORT", "6969"))
 VERSION_RE = re.compile(r"SPT\.Server/(\d+\.\d+\.\d+)")
+MOD_PACK = Path(os.environ.get("SPT_CLIENT_MOD_PACK", "/home/jianqianggu/spt/client-mods/spt-7900xtx-client-mods.zip"))
+MOD_PACK_NAME = "spt-7900xtx-client-mods.zip"
 
 _lock = threading.Lock()
 _attempts: dict[str, list[float]] = {}
@@ -176,10 +179,36 @@ class ImportHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
         print("downloaded one profile", flush=True)
 
+    def _send_mod_pack(self) -> None:
+        pack = MOD_PACK
+        if not pack.is_file() or pack.is_symlink():
+            self._json(404, {"ok": False, "error": "mod pack is not available"})
+            return
+        size = pack.stat().st_size
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Length", str(size))
+        self.send_header("Content-Disposition", f'attachment; filename="{MOD_PACK_NAME}"')
+        self._cors()
+        self.end_headers()
+        try:
+            with pack.open("rb") as handle:
+                while True:
+                    chunk = handle.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except (BrokenPipeError, ConnectionResetError):
+            return
+        print("sent client mod pack", flush=True)
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/health":
             self._json(200, {"ok": True})
+            return
+        if path == "/client-mods.zip":
+            self._send_mod_pack()
             return
         if path != "/status":
             self._json(404, {"ok": False, "error": "not found"})
