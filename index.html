@@ -93,7 +93,7 @@
     <h2>Bring your own profile</h2>
     <ol>
       <li>Install SPT, then extract the client mod pack below into that folder. Start your own SPT once so the profile is saved, then close your local server and the game.</li>
-      <li>Connect Tailscale. The first time, <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/health">open the import connection</a> and accept the certificate. Then choose your own file from <code>SPT/user/profiles</code>. The file name is your profile id. Leave every other file there.</li>
+      <li>Connect Tailscale. Profile import is <code>jianq-7900xtx.tail4219b.ts.net:6970</code>, not the game port <code>6969</code>. The first time, <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/health">open the import connection</a> and accept the certificate. Then choose your own file from <code>SPT/user/profiles</code>. The file name is your profile id. Leave every other file there.</li>
       <li>After the page confirms the import, wait about a minute. The game server reloads so it can see the new profile.</li>
       <li>Open the launcher, select this server, and log in with the same username. SPT 4.1 identifies a profile by username, so keep that name private.</li>
     </ol>
@@ -148,7 +148,7 @@
     };
     const statusNode = document.getElementById("server-status");
     const onlineList = document.getElementById("online-players");
-    const unreachable = "The server did not answer. Connect Tailscale, open the import connection link below, accept the certificate, then check again.";
+    const unreachable = "The import service did not answer. Connect Tailscale, open https://jianq-7900xtx.tail4219b.ts.net:6970/health, accept the certificate, then try again. The game address on port 6969 does not accept profile files.";
 
     function renderPlayers(payload) {
       onlineList.replaceChildren();

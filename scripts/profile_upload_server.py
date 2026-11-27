@@ -203,6 +203,7 @@ class ImportHandler(BaseHTTPRequestHandler):
         self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With, X-Replace-Profile")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
 
