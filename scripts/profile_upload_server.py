@@ -35,7 +35,15 @@ PORT = int(os.environ.get("SPT_IMPORT_PORT", "6970"))
 PROFILES_DIR = Path(os.environ.get("SPT_PROFILES_DIR", "/home/jianqianggu/spt/user/profiles"))
 CERT_FILE = Path(os.environ.get("SPT_TLS_CERT", "/home/jianqianggu/spt/certs/import.crt"))
 KEY_FILE = Path(os.environ.get("SPT_TLS_KEY", "/home/jianqianggu/spt/certs/import.key"))
-ALLOWED_ORIGIN = os.environ.get("SPT_ALLOWED_ORIGIN", "https://jianqianggu.github.io")
+ALLOWED_ORIGINS = {
+    origin.strip()
+    for origin in os.environ.get(
+        "SPT_ALLOWED_ORIGIN",
+        "https://jianqianggu.github.io,https://jianq-7900xtx.tail4219b.ts.net:6970",
+    ).split(",")
+    if origin.strip()
+}
+PAGE_FILE = Path(os.environ.get("SPT_PAGE_FILE", "/home/jianqianggu/spt/www/index.html"))
 IMPORT_HEADER = "SPTProfileImport"
 MAX_BODY = 8 * 1024 * 1024
 WINDOW_SECONDS = 600
@@ -198,8 +206,14 @@ class ImportHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         print(f"{self.address_string()} {fmt % args}", flush=True)
 
+    def _request_origin(self) -> str:
+        origin = self.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            return origin
+        return ""
+
     def _cors(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+        self.send_header("Access-Control-Allow-Origin", self._request_origin() or next(iter(ALLOWED_ORIGINS)))
         self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With, X-Replace-Profile")
@@ -217,7 +231,7 @@ class ImportHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _origin_ok(self) -> bool:
-        return self.headers.get("Origin") == ALLOWED_ORIGIN
+        return self._request_origin() != ""
 
     def do_OPTIONS(self) -> None:
         if not self._origin_ok():
@@ -306,6 +320,19 @@ class ImportHandler(BaseHTTPRequestHandler):
             return
         print("sent client mod pack", flush=True)
 
+    def _send_page(self) -> None:
+        page = PAGE_FILE
+        if not page.is_file() or page.is_symlink():
+            self._json(404, {"ok": False, "error": "connect page is not available"})
+            return
+        body = page.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+
     def _usernames(self) -> None:
         if not self._page_request():
             self._json(403, {"ok": False, "error": "this page only accepts the connect page"})
@@ -319,6 +346,9 @@ class ImportHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path in ("/", "/index.html"):
+            self._send_page()
+            return
         if path == "/health":
             self._json(200, {"ok": True})
             return

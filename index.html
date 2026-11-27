@@ -70,6 +70,7 @@
   <main>
     <h1>SPT server</h1>
     <p id="server-status" class="note" role="status">Checking the server…</p>
+    <p>The live status page is <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/">jianq-7900xtx.tail4219b.ts.net:6970</a>. Accept the certificate the first time. Port 6969 is only the game.</p>
     <h2>Online now</h2>
     <ul id="online-players"><li>Checking who is connected…</li></ul>
     <p><button id="status-refresh" type="button">Check again</button></p>
@@ -141,14 +142,18 @@
     </ul>
   </main>
   <script>
-    const serviceUrl = "https://jianq-7900xtx.tail4219b.ts.net:6970";
+    const serverPage = "https://jianq-7900xtx.tail4219b.ts.net:6970";
+    const onServer = location.hostname.endsWith(".ts.net");
+    const serviceUrl = onServer ? "" : serverPage;
     const pageHeaders = {
       "Content-Type": "application/json",
       "X-Requested-With": "SPTProfileImport"
     };
     const statusNode = document.getElementById("server-status");
     const onlineList = document.getElementById("online-players");
-    const unreachable = "The import service did not answer. Connect Tailscale, open https://jianq-7900xtx.tail4219b.ts.net:6970/health, accept the certificate, then try again. The game address on port 6969 does not accept profile files.";
+    const unreachable = onServer
+      ? "The status service on this page did not answer. Reload after accepting the certificate."
+      : "This public page cannot check the game. Open " + serverPage + "/ and accept the certificate. Port 6969 is the game and does not answer this check.";
 
     function renderPlayers(payload) {
       onlineList.replaceChildren();
