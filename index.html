@@ -37,6 +37,18 @@
       background: #2a2218;
       border-left: 4px solid #c9842a;
     }
+    form { margin: 1rem 0 0.6rem; }
+    input[type="file"] { display: block; margin-bottom: 0.8rem; }
+    button {
+      font: inherit;
+      background: #c9842a;
+      color: #1a140c;
+      border: 0;
+      border-radius: 6px;
+      padding: 0.55rem 0.9rem;
+      cursor: pointer;
+    }
+    #import-result { min-height: 1.4rem; }
     ol li, ul li { margin: 0.35rem 0; }
   </style>
 </head>
@@ -59,16 +71,21 @@
     <span class="addr">jianq-7900xtx.tail4219b.ts.net:6969</span>
     <p>Same home network</p>
     <span class="addr">192.168.0.12:6969</span>
-    <p class="note">There is no public internet address. A Tailscale invite comes from the server admin in private. This page is not an invite, and it does not accept uploads.</p>
+    <p class="note">There is no public internet address. A Tailscale invite comes from the server admin in private. This page is not an invite. The import below only works while Tailscale is connected.</p>
 
     <h2>Bring your own profile</h2>
     <ol>
       <li>Install the SPT version and client mods on this page. Start your own SPT once so the profile is saved, then close your local server and the game.</li>
-      <li>Open <code>SPT/user/profiles</code> on your PC. Copy the single JSON file whose name matches your profile. Leave every other file there, including other people's profiles and the <code>backups</code> folder.</li>
-      <li>Hand that one file to the server admin in private. A GitHub issue, a pull request, or a comment on this page is the wrong place for it.</li>
-      <li>The admin imports it on the server. The importer accepts one profile at a time, checks that the file name matches the profile id, and refuses a file that would take someone else's username.</li>
+      <li>Connect Tailscale. The first time, <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/health">open the import connection</a> and accept the certificate. Then choose your own file from <code>SPT/user/profiles</code>. The file name is your profile id. Leave every other file there.</li>
+      <li>After the page confirms the import, wait about a minute. The game server reloads so it can see the new profile.</li>
       <li>Open the launcher, select this server, and log in with the same username. SPT 4.1 identifies a profile by username, so keep that name private.</li>
     </ol>
+    <form id="import-form">
+      <input id="profile-file" type="file" accept=".json,application/json" required>
+      <button type="submit">Import profile</button>
+    </form>
+    <p id="import-result" role="status"></p>
+    <p>The file goes from your browser to the server over Tailscale. It is not stored on GitHub. A profile that reuses someone else's username is refused, and an upload cannot replace a profile already on the server.</p>
     <p>After the profile is on the server, play it here only. Running the same profile on your own server at the same time will split your progress.</p>
 
     <h2>Client mods to install</h2>
@@ -90,8 +107,49 @@
       <li>The game port is for Tailscale members and the home LAN. It is not published to the internet from this setup.</li>
       <li>The server web admin login is a separate password, works from the server itself, and is not written on this page.</li>
       <li>Profile files, server configs, and API keys stay off this website.</li>
-      <li>An imported profile cannot overwrite a different person's username.</li>
+      <li>The import page only accepts a profile from this website, and only while you are on Tailscale. Another website cannot submit one through your browser.</li>
+      <li>An imported profile cannot overwrite a different person's username or replace a profile already on the server.</li>
     </ul>
   </main>
+  <script>
+    const importUrl = "https://jianq-7900xtx.tail4219b.ts.net:6970/import";
+    const form = document.getElementById("import-form");
+    const result = document.getElementById("import-result");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const file = document.getElementById("profile-file").files[0];
+      result.textContent = "Importing…";
+      if (!file) {
+        result.textContent = "Choose your profile JSON file.";
+        return;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        result.textContent = "That file is larger than 8 MB.";
+        return;
+      }
+      let text;
+      try {
+        text = await file.text();
+      } catch (error) {
+        result.textContent = "The file could not be read.";
+        return;
+      }
+      try {
+        const response = await fetch(importUrl, {
+          method: "POST",
+          mode: "cors",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "SPTProfileImport"
+          },
+          body: text
+        });
+        const payload = await response.json();
+        result.textContent = payload.message || payload.error || "Import did not finish.";
+      } catch (error) {
+        result.textContent = "The server did not answer. Connect Tailscale, open the import connection link above, accept the certificate, then try again.";
+      }
+    });
+  </script>
 </body>
 </html>

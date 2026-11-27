@@ -10,3 +10,5 @@ fika.jsonc
 *.pfx
 .env
 .secrets
+__pycache__/
+*.pyc

@@ -2,6 +2,6 @@
 
 Public instructions for the shared SPT 4.1.6 server: how to point the launcher at it, and how to bring an existing profile.
 
-The game install, profiles, certificates, and server configs are not in this repository. Profile import is an admin command on the server (`scripts/import-profile.py`). It is not a web upload.
+The game install, profiles, certificates, and server configs are not in this repository. The connect page sends a profile to the Tailscale import service (`scripts/profile_upload_server.py`). That service checks the file, refuses username collisions, and does not accept a replacement for a profile already on the server.
 
 GitHub Pages serves `index.html`.

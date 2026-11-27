@@ -1,0 +1,20 @@
+[Unit]
+Description=SPT profile import over Tailscale
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/spt/scripts
+ExecStart=/usr/bin/python3 %h/spt/scripts/profile_upload_server.py
+Environment=SPT_BIND_HOST=100.64.91.97
+Environment=SPT_IMPORT_PORT=6970
+Environment=SPT_PROFILES_DIR=%h/spt/user/profiles
+Environment=SPT_TLS_CERT=%h/spt/certs/import.crt
+Environment=SPT_TLS_KEY=%h/spt/certs/import.key
+Environment=SPT_ALLOWED_ORIGIN=https://jianqianggu.github.io
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
