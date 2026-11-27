@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 
 MAX_BYTES = 8 * 1024 * 1024
+MAX_DOWNLOAD_BYTES = 32 * 1024 * 1024
 ID_RE = re.compile(r"^[a-f0-9]{24}$")
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
 
@@ -64,6 +65,32 @@ def _claims(profiles_dir: Path) -> list[tuple[str, str]]:
         except (UnicodeError, json.JSONDecodeError, OSError) as exc:
             raise ImportRejected(f"existing profile cannot be read safely: {path.name}") from exc
     return claims
+
+
+def read_profile_for_username(username: str, profiles_dir: Path) -> tuple[str, bytes]:
+    if not isinstance(username, str) or not USERNAME_RE.fullmatch(username):
+        raise ImportRejected("enter the username you use on this server")
+    if not profiles_dir.is_dir() or profiles_dir.is_symlink():
+        raise ImportRejected("profiles directory is missing")
+    matches: list[tuple[str, Path]] = []
+    for path in profiles_dir.glob("*.json"):
+        if path.name.startswith(".") or path.is_symlink() or not path.is_file():
+            continue
+        if path.stat().st_size > MAX_DOWNLOAD_BYTES:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+            info = data.get("info", {})
+        except (UnicodeError, json.JSONDecodeError, OSError):
+            continue
+        if info.get("username") == username and info.get("id") == path.stem and ID_RE.fullmatch(path.stem):
+            matches.append((path.stem, path))
+    if not matches:
+        raise ImportRejected("no profile with that username")
+    if len(matches) > 1:
+        raise ImportRejected("more than one profile uses that username")
+    profile_id, path = matches[0]
+    return profile_id, path.read_bytes()
 
 
 def store_profile(data: dict, profiles_dir: Path, replace: bool = False) -> tuple[str, str]:

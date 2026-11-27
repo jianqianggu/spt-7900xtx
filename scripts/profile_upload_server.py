@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import socket
 import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from profile_import import ImportRejected, parse_profile, store_profile
+from profile_import import ImportRejected, parse_profile, read_profile_for_username, store_profile
 
 BIND_HOST = os.environ.get("SPT_BIND_HOST", "100.64.91.97")
 PORT = int(os.environ.get("SPT_IMPORT_PORT", "6970"))
@@ -30,6 +32,9 @@ WINDOW_SECONDS = 600
 MAX_ATTEMPTS = 20
 RELOAD_GAP_SECONDS = 45
 SKIP_RELOAD = os.environ.get("SPT_SKIP_RELOAD") == "1"
+DEPS_FILE = Path(os.environ.get("SPT_DEPS_FILE", "/home/jianqianggu/spt/SPT.Server.deps.json"))
+SPT_PORT = int(os.environ.get("SPT_GAME_PORT", "6969"))
+VERSION_RE = re.compile(r"SPT\.Server/(\d+\.\d+\.\d+)")
 
 _lock = threading.Lock()
 _attempts: dict[str, list[float]] = {}
@@ -48,6 +53,23 @@ def _rate_limited(ip: str) -> bool:
         return True
     recent.append(now)
     return False
+
+
+def _server_status() -> dict:
+    version = "unknown"
+    try:
+        version_match = VERSION_RE.search(DEPS_FILE.read_text(encoding="utf-8"))
+        if version_match:
+            version = version_match.group(1)
+    except OSError:
+        version = "unknown"
+    listening = False
+    try:
+        with socket.create_connection(("127.0.0.1", SPT_PORT), timeout=2):
+            listening = True
+    except OSError:
+        listening = False
+    return {"ok": True, "spt": "up" if listening else "down", "version": version}
 
 
 def _reload_server() -> None:
@@ -99,14 +121,80 @@ class ImportHandler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
 
+    def _page_request(self) -> bool:
+        return self._origin_ok() and self.headers.get("X-Requested-With") == IMPORT_HEADER
+
+    def _read_body(self, limit: int) -> bytes | None:
+        length = self.headers.get("Content-Length")
+        if length is None or not length.isdigit():
+            self._json(411, {"ok": False, "error": "request size is missing"})
+            return None
+        size = int(length)
+        if size <= 0 or size > limit:
+            self._json(413, {"ok": False, "error": "request is too large"})
+            return None
+        raw = self.rfile.read(size)
+        if len(raw) != size:
+            self._json(400, {"ok": False, "error": "request was incomplete"})
+            return None
+        return raw
+
+    def _download(self) -> None:
+        if not self._page_request():
+            self._json(403, {"ok": False, "error": "this download only accepts the connect page"})
+            return
+        if self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
+            self._json(415, {"ok": False, "error": "send the username as JSON"})
+            return
+        raw = self._read_body(4096)
+        if raw is None:
+            return
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError):
+            self._json(400, {"ok": False, "error": "username request is not JSON"})
+            return
+        username = payload.get("username") if isinstance(payload, dict) else None
+        with _lock:
+            if _rate_limited(_client_ip(self)):
+                self._json(429, {"ok": False, "error": "too many requests from this network; wait and try again"})
+                return
+            try:
+                profile_id, body = read_profile_for_username(username, PROFILES_DIR)
+            except ImportRejected as exc:
+                status = 404 if str(exc) == "no profile with that username" else 400
+                self._json(status, {"ok": False, "error": str(exc)})
+                return
+        filename = f"{profile_id}.json"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Access-Control-Expose-Headers", "Content-Disposition")
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+        print("downloaded one profile", flush=True)
+
     def do_GET(self) -> None:
-        if self.path.split("?", 1)[0] != "/health":
+        path = self.path.split("?", 1)[0]
+        if path == "/health":
+            self._json(200, {"ok": True})
+            return
+        if path != "/status":
             self._json(404, {"ok": False, "error": "not found"})
             return
-        self._json(200, {"ok": True})
+        if not self._page_request():
+            self._json(403, {"ok": False, "error": "this page only accepts the connect page"})
+            return
+        self._json(200, _server_status())
 
     def do_POST(self) -> None:
-        if self.path.split("?", 1)[0] != "/import":
+        path = self.path.split("?", 1)[0]
+        if path == "/download":
+            self._download()
+            return
+        if path != "/import":
             self._json(404, {"ok": False, "error": "not found"})
             return
         if not self._origin_ok() or self.headers.get("X-Requested-With") != IMPORT_HEADER:

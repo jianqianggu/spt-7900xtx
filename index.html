@@ -48,13 +48,29 @@
       padding: 0.55rem 0.9rem;
       cursor: pointer;
     }
-    #import-result { min-height: 1.4rem; }
+    #import-result, #download-result { min-height: 1.4rem; }
+    input[type="text"] {
+      font: inherit;
+      display: block;
+      width: 100%;
+      max-width: 20rem;
+      box-sizing: border-box;
+      margin-bottom: 0.8rem;
+      padding: 0.45rem 0.55rem;
+      background: #241f16;
+      color: #f3ead7;
+      border: 1px solid #6b5428;
+      border-radius: 6px;
+    }
+    button + button { margin-left: 0.5rem; }
     ol li, ul li { margin: 0.35rem 0; }
   </style>
 </head>
 <body>
   <main>
     <h1>SPT server</h1>
+    <p id="server-status" class="note" role="status">Checking the server…</p>
+    <p><button id="status-refresh" type="button">Check again</button></p>
     <p>Shared SPT 4.1.6 server for invited players. Bring the profile you already play, then join from the SPT launcher.</p>
 
     <h2>What you need installed</h2>
@@ -88,6 +104,14 @@
     <p>The file goes from your browser to the server over Tailscale. It is not stored on GitHub. A profile that reuses someone else's username is refused, and an upload cannot replace a profile already on the server.</p>
     <p>After the profile is on the server, play it here only. Running the same profile on your own server at the same time will split your progress.</p>
 
+    <h2>Download your latest profile</h2>
+    <p>Enter the username you use on this server. The download is the last copy the server saved for that name. The page does not list other players.</p>
+    <form id="download-form">
+      <input id="download-username" type="text" maxlength="32" autocomplete="off" required>
+      <button type="submit">Download profile</button>
+    </form>
+    <p id="download-result" role="status"></p>
+
     <h2>Client mods to install</h2>
     <p>These are the BepInEx plugins that match this server. Server-only mods already run on the host.</p>
     <ul>
@@ -109,10 +133,40 @@
       <li>Profile files, server configs, and API keys stay off this website.</li>
       <li>The import page only accepts a profile from this website, and only while you are on Tailscale. Another website cannot submit one through your browser.</li>
       <li>An imported profile cannot overwrite a different person's username or replace a profile already on the server.</li>
+      <li>A download returns one profile for the username you type. It does not offer a list of the profiles on the server.</li>
     </ul>
   </main>
   <script>
-    const importUrl = "https://jianq-7900xtx.tail4219b.ts.net:6970/import";
+    const serviceUrl = "https://jianq-7900xtx.tail4219b.ts.net:6970";
+    const pageHeaders = {
+      "Content-Type": "application/json",
+      "X-Requested-With": "SPTProfileImport"
+    };
+    const statusNode = document.getElementById("server-status");
+    const unreachable = "The server did not answer. Connect Tailscale, open the import connection link below, accept the certificate, then check again.";
+
+    async function refreshStatus() {
+      statusNode.textContent = "Checking the server…";
+      try {
+        const response = await fetch(serviceUrl + "/status", { headers: pageHeaders });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          statusNode.textContent = payload.error || "Status check failed.";
+          return;
+        }
+        const version = payload.version && payload.version !== "unknown" ? "SPT " + payload.version : "SPT";
+        statusNode.textContent = payload.spt === "up"
+          ? version + " is up."
+          : version + " is not accepting players right now.";
+      } catch (error) {
+        statusNode.textContent = unreachable;
+      }
+    }
+
+    document.getElementById("status-refresh").addEventListener("click", refreshStatus);
+    refreshStatus();
+
+    const importUrl = serviceUrl + "/import";
     const form = document.getElementById("import-form");
     const result = document.getElementById("import-result");
     form.addEventListener("submit", async (event) => {
@@ -147,7 +201,39 @@
         const payload = await response.json();
         result.textContent = payload.message || payload.error || "Import did not finish.";
       } catch (error) {
-        result.textContent = "The server did not answer. Connect Tailscale, open the import connection link above, accept the certificate, then try again.";
+        result.textContent = unreachable;
+      }
+    });
+
+    const downloadForm = document.getElementById("download-form");
+    const downloadResult = document.getElementById("download-result");
+    downloadForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const username = document.getElementById("download-username").value.trim();
+      downloadResult.textContent = "Downloading…";
+      try {
+        const response = await fetch(serviceUrl + "/download", {
+          method: "POST",
+          mode: "cors",
+          headers: pageHeaders,
+          body: JSON.stringify({ username: username })
+        });
+        const type = response.headers.get("Content-Type") || "";
+        if (!response.ok || type.indexOf("application/json") === -1 || (response.headers.get("Content-Disposition") || "").indexOf("attachment") === -1) {
+          const payload = await response.json();
+          downloadResult.textContent = payload.error || "Download did not finish.";
+          return;
+        }
+        const blob = await response.blob();
+        const match = /filename="([a-f0-9]{24}\.json)"/.exec(response.headers.get("Content-Disposition") || "");
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = match ? match[1] : "profile.json";
+        link.click();
+        URL.revokeObjectURL(link.href);
+        downloadResult.textContent = "Downloaded the latest copy of that profile.";
+      } catch (error) {
+        downloadResult.textContent = unreachable;
       }
     });
   </script>
