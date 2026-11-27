@@ -102,13 +102,14 @@
       <button type="submit">Import profile</button>
     </form>
     <p id="import-result" role="status"></p>
-    <p>The file goes from your browser to the server over Tailscale. It is not stored on GitHub. A profile that reuses someone else's username is refused, and an upload cannot replace a profile already on the server.</p>
+    <p>The file goes from your browser to the server over Tailscale. It is not stored on GitHub. If that same profile is already on the server, the page asks before replacing the saved file. An upload still cannot take a username that belongs to a different profile.</p>
     <p>After the profile is on the server, play it here only. Running the same profile on your own server at the same time will split your progress.</p>
 
     <h2>Download your latest profile</h2>
-    <p>Enter the username you use on this server. The download is the last copy the server saved for that name. It does not list saved profiles.</p>
+    <p>Pick your username, or start typing and choose it from the list. The download is the last copy the server saved for that name.</p>
     <form id="download-form">
-      <input id="download-username" type="text" maxlength="32" autocomplete="off" required>
+      <input id="download-username" type="text" maxlength="32" list="profile-names" required>
+      <datalist id="profile-names"></datalist>
       <button type="submit">Download profile</button>
     </form>
     <p id="download-result" role="status"></p>
@@ -133,8 +134,8 @@
       <li>The server web admin login is a separate password, works from the server itself, and is not written on this page.</li>
       <li>Profile files, server configs, and API keys stay off this website.</li>
       <li>The import page only accepts a profile from this website, and only while you are on Tailscale. Another website cannot submit one through your browser.</li>
-      <li>An imported profile cannot overwrite a different person's username or replace a profile already on the server.</li>
-      <li>A download returns one profile for the username you type. It does not offer a list of the profiles on the server.</li>
+      <li>Replacing a profile asks for confirmation first, and only rewrites that same profile file. It cannot take a username that belongs to a different profile.</li>
+      <li>The download box lists usernames already on the server so you can pick yours. The file it returns is only the profile for the name you choose.</li>
       <li>Online now shows the nickname of someone connected at the moment. It does not list saved profiles or profile files.</li>
       <li>The client mod pack is a direct file on the Tailscale address. It is not published from this website.</li>
     </ul>
@@ -200,6 +201,25 @@
     refreshStatus(true);
     setInterval(() => refreshStatus(false), 20000);
 
+    const nameList = document.getElementById("profile-names");
+    async function loadUsernames() {
+      try {
+        const response = await fetch(serviceUrl + "/usernames", { headers: pageHeaders });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok || !Array.isArray(payload.usernames)) return;
+        nameList.replaceChildren();
+        payload.usernames.forEach((name) => {
+          if (typeof name !== "string" || !/^[A-Za-z0-9_-]{1,32}$/.test(name)) return;
+          const option = document.createElement("option");
+          option.value = name;
+          nameList.append(option);
+        });
+      } catch (error) {
+        nameList.replaceChildren();
+      }
+    }
+    loadUsernames();
+
     const importUrl = serviceUrl + "/import";
     const form = document.getElementById("import-form");
     const result = document.getElementById("import-result");
@@ -222,17 +242,35 @@
         result.textContent = "The file could not be read.";
         return;
       }
+      let username = "that profile";
       try {
-        const response = await fetch(importUrl, {
-          method: "POST",
-          mode: "cors",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "SPTProfileImport"
-          },
-          body: text
-        });
-        const payload = await response.json();
+        const info = JSON.parse(text).info;
+        if (info && typeof info.username === "string") username = info.username;
+      } catch (error) {
+        result.textContent = "The file is not valid JSON.";
+        return;
+      }
+      const sendImport = (replace) => {
+        const headers = {
+          "Content-Type": "application/json",
+          "X-Requested-With": "SPTProfileImport"
+        };
+        if (replace) headers["X-Replace-Profile"] = "yes";
+        return fetch(importUrl, { method: "POST", mode: "cors", headers: headers, body: text });
+      };
+      try {
+        let response = await sendImport(false);
+        let payload = await response.json();
+        if (response.status === 409 && payload.canReplace) {
+          const confirmed = window.confirm("A profile for " + username + " is already on the server. Replace that saved file with this upload?");
+          if (!confirmed) {
+            result.textContent = "Left the existing profile in place.";
+            return;
+          }
+          result.textContent = "Replacing…";
+          response = await sendImport(true);
+          payload = await response.json();
+        }
         result.textContent = payload.message || payload.error || "Import did not finish.";
       } catch (error) {
         result.textContent = unreachable;

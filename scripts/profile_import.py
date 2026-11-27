@@ -1,7 +1,8 @@
 """Validate and store one SPT profile.
 
 The CLI and the Tailscale upload service both use this module.
-A profile can only be added. It cannot take a username that already exists.
+A new profile cannot take a username that already belongs to a different file.
+The same profile file can be rewritten when replacement is confirmed.
 """
 
 from __future__ import annotations
@@ -67,6 +68,31 @@ def _claims(profiles_dir: Path) -> list[tuple[str, str]]:
     return claims
 
 
+def list_usernames(profiles_dir: Path) -> list[str]:
+    if not profiles_dir.is_dir() or profiles_dir.is_symlink():
+        raise ImportRejected("profiles directory is missing")
+    names: set[str] = set()
+    for path in profiles_dir.glob("*.json"):
+        if path.name.startswith(".") or path.is_symlink() or not path.is_file():
+            continue
+        if path.stat().st_size > MAX_DOWNLOAD_BYTES:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+            info = data.get("info", {})
+        except (UnicodeError, json.JSONDecodeError, OSError):
+            continue
+        username = info.get("username")
+        if (
+            isinstance(username, str)
+            and USERNAME_RE.fullmatch(username)
+            and info.get("id") == path.stem
+            and ID_RE.fullmatch(path.stem)
+        ):
+            names.add(username)
+    return sorted(names, key=str.casefold)
+
+
 def read_profile_for_username(username: str, profiles_dir: Path) -> tuple[str, bytes]:
     if not isinstance(username, str) or not USERNAME_RE.fullmatch(username):
         raise ImportRejected("enter the username you use on this server")
@@ -106,9 +132,7 @@ def store_profile(data: dict, profiles_dir: Path, replace: bool = False) -> tupl
         if existing_username.lower() == username.lower() and not same_file:
             raise ImportRejected("that username is already used by another profile")
         if same_file and not replace:
-            raise ImportRejected("this profile is already on the server; log in with your username")
-        if same_file and replace and existing_username != username:
-            raise ImportRejected("refusing to replace a profile whose username changed")
+            raise ImportRejected("this profile is already on the server")
 
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(payload) > MAX_BYTES:

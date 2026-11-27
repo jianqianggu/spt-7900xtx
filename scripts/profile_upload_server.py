@@ -22,7 +22,13 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from profile_import import ImportRejected, parse_profile, read_profile_for_username, store_profile
+from profile_import import (
+    ImportRejected,
+    list_usernames,
+    parse_profile,
+    read_profile_for_username,
+    store_profile,
+)
 
 BIND_HOST = os.environ.get("SPT_BIND_HOST", "100.64.91.97")
 PORT = int(os.environ.get("SPT_IMPORT_PORT", "6970"))
@@ -196,7 +202,7 @@ class ImportHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
         self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With, X-Replace-Profile")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-store")
 
@@ -299,6 +305,17 @@ class ImportHandler(BaseHTTPRequestHandler):
             return
         print("sent client mod pack", flush=True)
 
+    def _usernames(self) -> None:
+        if not self._page_request():
+            self._json(403, {"ok": False, "error": "this page only accepts the connect page"})
+            return
+        try:
+            names = list_usernames(PROFILES_DIR)
+        except ImportRejected as exc:
+            self._json(400, {"ok": False, "error": str(exc)})
+            return
+        self._json(200, {"ok": True, "usernames": names})
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/health":
@@ -306,6 +323,9 @@ class ImportHandler(BaseHTTPRequestHandler):
             return
         if path == "/client-mods.zip":
             self._send_mod_pack()
+            return
+        if path == "/usernames":
+            self._usernames()
             return
         if path != "/status":
             self._json(404, {"ok": False, "error": "not found"})
@@ -350,23 +370,33 @@ class ImportHandler(BaseHTTPRequestHandler):
             if time.monotonic() - _last_reload < RELOAD_GAP_SECONDS:
                 self._json(429, {"ok": False, "error": "the server is still reloading; wait a minute and try again"})
                 return
+            replace = self.headers.get("X-Replace-Profile") == "yes"
             try:
-                _profile_id, username = store_profile(parse_profile(raw), PROFILES_DIR, replace=False)
+                _profile_id, username = store_profile(parse_profile(raw), PROFILES_DIR, replace=replace)
                 _reload_server()
             except ImportRejected as exc:
-                self._json(400, {"ok": False, "error": str(exc)})
+                message = str(exc)
+                if message == "this profile is already on the server":
+                    self._json(409, {"ok": False, "error": message, "canReplace": True})
+                    return
+                self._json(400, {"ok": False, "error": message})
                 return
             except subprocess.SubprocessError:
                 print(f"profile stored for {username} but server reload failed", flush=True)
                 self._json(500, {"ok": False, "error": "profile was saved, but the server did not reload"})
                 return
-        print(f"imported username {username} from {ip}", flush=True)
+        print(f"{'replaced' if replace else 'imported'} username {username} from {ip}", flush=True)
         self._json(
             200,
             {
                 "ok": True,
                 "username": username,
-                "message": "Profile imported. The server is reloading. Wait about a minute, then log in with this username.",
+                "replaced": replace,
+                "message": (
+                    "Replaced the existing profile. The server is reloading. Wait about a minute, then log in with this username."
+                    if replace
+                    else "Profile imported. The server is reloading. Wait about a minute, then log in with this username."
+                ),
             },
         )
 
