@@ -13,9 +13,12 @@ import json
 import os
 import re
 import socket
+import ssl
 import subprocess
 import threading
 import time
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -38,6 +41,33 @@ SPT_PORT = int(os.environ.get("SPT_GAME_PORT", "6969"))
 VERSION_RE = re.compile(r"SPT\.Server/(\d+\.\d+\.\d+)")
 MOD_PACK = Path(os.environ.get("SPT_CLIENT_MOD_PACK", "/home/jianqianggu/spt/client-mods/spt-7900xtx-client-mods.zip"))
 MOD_PACK_NAME = "spt-7900xtx-client-mods.zip"
+ACTIVITIES = {
+    0: "In the menu",
+    1: "In a raid",
+    2: "In the stash",
+    3: "In the hideout",
+    4: "On the flea",
+    "IN_MENU": "In the menu",
+    "IN_RAID": "In a raid",
+    "IN_STASH": "In the stash",
+    "IN_HIDEOUT": "In the hideout",
+    "IN_FLEA": "On the flea",
+}
+LOCATIONS = {
+    "bigmap": "Customs",
+    "factory4_day": "Factory",
+    "factory4_night": "Factory",
+    "interchange": "Interchange",
+    "laboratory": "The Lab",
+    "labyrinth": "The Labyrinth",
+    "lighthouse": "Lighthouse",
+    "rezervbase": "Reserve",
+    "sandbox": "Ground Zero",
+    "sandbox_high": "Ground Zero",
+    "shoreline": "Shoreline",
+    "tarkovstreets": "Streets",
+    "woods": "Woods",
+}
 
 _lock = threading.Lock()
 _attempts: dict[str, list[float]] = {}
@@ -58,6 +88,66 @@ def _rate_limited(ip: str) -> bool:
     return False
 
 
+def _clean_name(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    name = " ".join(value.split())
+    if not name or len(name) > 32 or any(ord(char) < 32 for char in name):
+        return None
+    return name
+
+
+def _player_view(entry: object) -> dict | None:
+    if not isinstance(entry, dict):
+        return None
+    name = _clean_name(entry.get("nickname"))
+    if name is None:
+        return None
+    level = entry.get("level")
+    if isinstance(level, bool) or not isinstance(level, int) or level < 0 or level > 99:
+        level = None
+    activity = ACTIVITIES.get(entry.get("activity"), "Online")
+    raid = entry.get("raidInformation")
+    place = None
+    if isinstance(raid, dict):
+        place = LOCATIONS.get(raid.get("location"))
+        if activity == "In a raid" and raid.get("started") is False:
+            activity = "In a raid lobby"
+    view = {"nickname": name, "activity": activity}
+    if level is not None:
+        view["level"] = level
+    if place and activity.startswith("In a raid"):
+        view["place"] = place
+    return view
+
+
+def _online_players() -> list | None:
+    context = ssl._create_unverified_context()
+    request = urllib.request.Request(
+        f"https://127.0.0.1:{SPT_PORT}/fika/presence/get",
+        headers={"responsecompressed": "0"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, context=context, timeout=3) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError, urllib.error.URLError):
+        return None
+    if isinstance(payload, dict):
+        entries = list(payload.values())
+    elif isinstance(payload, list):
+        entries = payload
+    else:
+        return None
+    players = []
+    for entry in entries[:32]:
+        view = _player_view(entry)
+        if view is not None:
+            players.append(view)
+    players.sort(key=lambda item: item["nickname"].casefold())
+    return players
+
+
 def _server_status() -> dict:
     version = "unknown"
     try:
@@ -72,7 +162,14 @@ def _server_status() -> dict:
             listening = True
     except OSError:
         listening = False
-    return {"ok": True, "spt": "up" if listening else "down", "version": version}
+    result = {"ok": True, "spt": "up" if listening else "down", "version": version, "players": []}
+    if not listening:
+        result["playersAvailable"] = False
+        return result
+    players = _online_players()
+    result["playersAvailable"] = players is not None
+    result["players"] = players or []
+    return result
 
 
 def _reload_server() -> None:

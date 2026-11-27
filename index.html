@@ -70,6 +70,8 @@
   <main>
     <h1>SPT server</h1>
     <p id="server-status" class="note" role="status">Checking the server…</p>
+    <h2>Online now</h2>
+    <ul id="online-players"><li>Checking who is connected…</li></ul>
     <p><button id="status-refresh" type="button">Check again</button></p>
     <p>Shared SPT 4.1.6 server for invited players. Bring the profile you already play, then join from the SPT launcher.</p>
 
@@ -104,7 +106,7 @@
     <p>After the profile is on the server, play it here only. Running the same profile on your own server at the same time will split your progress.</p>
 
     <h2>Download your latest profile</h2>
-    <p>Enter the username you use on this server. The download is the last copy the server saved for that name. The page does not list other players.</p>
+    <p>Enter the username you use on this server. The download is the last copy the server saved for that name. It does not list saved profiles.</p>
     <form id="download-form">
       <input id="download-username" type="text" maxlength="32" autocomplete="off" required>
       <button type="submit">Download profile</button>
@@ -133,6 +135,7 @@
       <li>The import page only accepts a profile from this website, and only while you are on Tailscale. Another website cannot submit one through your browser.</li>
       <li>An imported profile cannot overwrite a different person's username or replace a profile already on the server.</li>
       <li>A download returns one profile for the username you type. It does not offer a list of the profiles on the server.</li>
+      <li>Online now shows the nickname of someone connected at the moment. It does not list saved profiles or profile files.</li>
       <li>The client mod pack is a direct file on the Tailscale address. It is not published from this website.</li>
     </ul>
   </main>
@@ -143,28 +146,59 @@
       "X-Requested-With": "SPTProfileImport"
     };
     const statusNode = document.getElementById("server-status");
+    const onlineList = document.getElementById("online-players");
     const unreachable = "The server did not answer. Connect Tailscale, open the import connection link below, accept the certificate, then check again.";
 
-    async function refreshStatus() {
-      statusNode.textContent = "Checking the server…";
+    function renderPlayers(payload) {
+      onlineList.replaceChildren();
+      const item = document.createElement("li");
+      if (!payload || !payload.playersAvailable) {
+        item.textContent = "The online list is not available.";
+        onlineList.append(item);
+        return;
+      }
+      const players = Array.isArray(payload.players) ? payload.players : [];
+      if (players.length === 0) {
+        item.textContent = "Nobody is connected.";
+        onlineList.append(item);
+        return;
+      }
+      players.forEach((player) => {
+        if (!player || typeof player.nickname !== "string") return;
+        const row = document.createElement("li");
+        let text = player.nickname;
+        if (typeof player.level === "number") text += ", level " + player.level;
+        if (typeof player.activity === "string") text += " — " + player.activity;
+        if (typeof player.place === "string") text += " on " + player.place;
+        row.textContent = text;
+        onlineList.append(row);
+      });
+    }
+
+    async function refreshStatus(manual) {
+      if (manual) statusNode.textContent = "Checking the server…";
       try {
         const response = await fetch(serviceUrl + "/status", { headers: pageHeaders });
         const payload = await response.json();
         if (!response.ok || !payload.ok) {
           statusNode.textContent = payload.error || "Status check failed.";
+          renderPlayers(null);
           return;
         }
         const version = payload.version && payload.version !== "unknown" ? "SPT " + payload.version : "SPT";
         statusNode.textContent = payload.spt === "up"
           ? version + " is up."
           : version + " is not accepting players right now.";
+        renderPlayers(payload);
       } catch (error) {
         statusNode.textContent = unreachable;
+        renderPlayers(null);
       }
     }
 
-    document.getElementById("status-refresh").addEventListener("click", refreshStatus);
-    refreshStatus();
+    document.getElementById("status-refresh").addEventListener("click", () => refreshStatus(true));
+    refreshStatus(true);
+    setInterval(() => refreshStatus(false), 20000);
 
     const importUrl = serviceUrl + "/import";
     const form = document.getElementById("import-form");
