@@ -9,6 +9,8 @@ browser. The mod pack is a direct download on that same Tailscale address.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import hashlib
 import json
 import os
 import re
@@ -48,6 +50,7 @@ ALLOWED_ORIGINS = {
     if origin.strip()
 }
 PAGE_FILE = Path(os.environ.get("SPT_PAGE_FILE", "/home/jianqianggu/spt/www/index.html"))
+MANIFEST_FILE = Path(os.environ.get("SPT_MANIFEST_FILE", "/home/jianqianggu/spt/www/server-updates.json"))
 IMPORT_HEADER = "SPTProfileImport"
 MAX_BODY = 8 * 1024 * 1024
 WINDOW_SECONDS = 600
@@ -88,8 +91,81 @@ LOCATIONS = {
 }
 
 _lock = threading.Lock()
+_pack_lock = threading.Lock()
+_pack_cache: tuple[int, int, str] | None = None
 _attempts: dict[str, list[float]] = {}
 _last_reload = -RELOAD_GAP_SECONDS
+
+
+def _mod_pack_info() -> dict | None:
+    global _pack_cache
+    pack = MOD_PACK
+    if not pack.is_file() or pack.is_symlink():
+        return None
+    try:
+        stat = pack.stat()
+    except OSError:
+        return None
+    with _pack_lock:
+        if _pack_cache is not None and _pack_cache[0] == stat.st_mtime_ns and _pack_cache[1] == stat.st_size:
+            digest = _pack_cache[2]
+        else:
+            hasher = hashlib.sha256()
+            try:
+                with pack.open("rb") as handle:
+                    while True:
+                        chunk = handle.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        hasher.update(chunk)
+            except OSError:
+                return None
+            digest = hasher.hexdigest()
+            _pack_cache = (stat.st_mtime_ns, stat.st_size, digest)
+    updated_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "fileName": MOD_PACK_NAME,
+        "size": stat.st_size,
+        "sha256": digest,
+        "updatedAt": updated_at,
+    }
+
+
+def _read_manifest() -> dict | None:
+    manifest = MANIFEST_FILE
+    if not manifest.is_file() or manifest.is_symlink():
+        return None
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _headless_count() -> int | None:
+    context = ssl._create_unverified_context()
+    request = urllib.request.Request(
+        f"https://127.0.0.1:{SPT_PORT}/fika/headless/available",
+        headers={"responsecompressed": "0"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, context=context, timeout=3) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError, urllib.error.URLError):
+        return None
+    if isinstance(payload, list):
+        return len(payload)
+    if isinstance(payload, dict):
+        return len(payload)
+    return None
+
+
+def _active_raid_count() -> int:
+    players = _online_players()
+    if not players:
+        return 0
+    return sum(1 for player in players if str(player.get("activity", "")).startswith("In a raid"))
 
 
 def _client_ip(handler: BaseHTTPRequestHandler) -> str:
@@ -181,12 +257,38 @@ def _server_status() -> dict:
     except OSError:
         listening = False
     result = {"ok": True, "spt": "up" if listening else "down", "version": version, "players": []}
+    manifest = _read_manifest()
+    if manifest:
+        if isinstance(manifest.get("packVersion"), str):
+            result["packVersion"] = manifest["packVersion"]
+        updates = manifest.get("updates")
+        if isinstance(updates, list):
+            for entry in updates:
+                if isinstance(entry, dict) and entry.get("breaking") is True:
+                    result["latestBreaking"] = {
+                        "date": entry.get("date", ""),
+                        "packVersion": entry.get("packVersion", ""),
+                        "title": entry.get("title", ""),
+                        "summary": entry.get("summary", ""),
+                        "action": entry.get("action", ""),
+                    }
+                    break
+    pack = _mod_pack_info()
+    if pack:
+        result["packSha256"] = pack["sha256"]
+        result["packSize"] = pack["size"]
+        result["packUpdatedAt"] = pack["updatedAt"]
     if not listening:
         result["playersAvailable"] = False
+        result["headlessAvailable"] = False
+        result["headlessCount"] = 0
         return result
     players = _online_players()
     result["playersAvailable"] = players is not None
     result["players"] = players or []
+    headless_count = _headless_count()
+    result["headlessAvailable"] = headless_count is not None
+    result["headlessCount"] = headless_count or 0
     return result
 
 
@@ -352,10 +454,40 @@ class ImportHandler(BaseHTTPRequestHandler):
             return
         self._json(200, {"ok": True, "usernames": names})
 
+    def _send_manifest_file(self) -> None:
+        manifest = MANIFEST_FILE
+        if not manifest.is_file() or manifest.is_symlink():
+            self._json(404, {"ok": False, "error": "server updates file is not available"})
+            return
+        body = manifest.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _manifest(self) -> None:
+        if not self._page_request() and not self._on_tailnet_or_lan():
+            self._json(403, {"ok": False, "error": "this page only accepts the connect page"})
+            return
+        data = _read_manifest() or {}
+        payload = {"ok": True, **data}
+        pack = _mod_pack_info()
+        if pack:
+            payload["modPack"] = pack
+        self._json(200, payload)
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             self._send_page()
+            return
+        if path == "/server-updates.json":
+            self._send_manifest_file()
+            return
+        if path == "/manifest":
+            self._manifest()
             return
         if path == "/health":
             self._json(200, {"ok": True})
@@ -408,6 +540,15 @@ class ImportHandler(BaseHTTPRequestHandler):
                 return
             if time.monotonic() - _last_reload < RELOAD_GAP_SECONDS:
                 self._json(429, {"ok": False, "error": "the server is still reloading; wait a minute and try again"})
+                return
+            if not SKIP_RELOAD and _active_raid_count() > 0:
+                self._json(
+                    409,
+                    {
+                        "ok": False,
+                        "error": "someone is in a raid right now; wait until the raid finishes before importing or replacing a profile",
+                    },
+                )
                 return
             replace = self.headers.get("X-Replace-Profile") == "yes"
             try:

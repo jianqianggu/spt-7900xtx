@@ -10,13 +10,32 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import tempfile
+import time
 from pathlib import Path
 
 MAX_BYTES = 8 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 32 * 1024 * 1024
 ID_RE = re.compile(r"^[a-f0-9]{24}$")
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,32}$")
+HEADLESS_MEMBER_CATEGORY = 128
+
+
+def is_headless_profile(data: dict) -> bool:
+    info = data.get("info")
+    if isinstance(info, dict):
+        username = info.get("username")
+        if isinstance(username, str) and username.lower().startswith("headless_"):
+            return True
+    characters = data.get("characters")
+    if isinstance(characters, dict):
+        pmc = characters.get("pmc")
+        if isinstance(pmc, dict):
+            pmc_info = pmc.get("Info")
+            if isinstance(pmc_info, dict) and pmc_info.get("MemberCategory") == HEADLESS_MEMBER_CATEGORY:
+                return True
+    return False
 
 
 class ImportRejected(Exception):
@@ -82,6 +101,8 @@ def list_usernames(profiles_dir: Path) -> list[str]:
             info = data.get("info", {})
         except (UnicodeError, json.JSONDecodeError, OSError):
             continue
+        if is_headless_profile(data):
+            continue
         username = info.get("username")
         if (
             isinstance(username, str)
@@ -109,6 +130,8 @@ def read_profile_for_username(username: str, profiles_dir: Path) -> tuple[str, b
             info = data.get("info", {})
         except (UnicodeError, json.JSONDecodeError, OSError):
             continue
+        if is_headless_profile(data):
+            continue
         if info.get("username") == username and info.get("id") == path.stem and ID_RE.fullmatch(path.stem):
             matches.append((path.stem, path))
     if not matches:
@@ -119,9 +142,23 @@ def read_profile_for_username(username: str, profiles_dir: Path) -> tuple[str, b
     return profile_id, path.read_bytes()
 
 
+def _backup_existing(destination: Path, profiles_dir: Path) -> None:
+    if not destination.is_file() or destination.is_symlink():
+        return
+    backups_dir = profiles_dir / ".backups"
+    backups_dir.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(backups_dir, 0o700)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    backup_path = backups_dir / f"{destination.stem}.{stamp}.json"
+    shutil.copy2(destination, backup_path)
+    os.chmod(backup_path, 0o600)
+
+
 def store_profile(data: dict, profiles_dir: Path, replace: bool = False) -> tuple[str, str]:
     if not profiles_dir.is_dir() or profiles_dir.is_symlink():
         raise ImportRejected("profiles directory is missing")
+    if is_headless_profile(data):
+        raise ImportRejected("headless profiles cannot be uploaded here")
     profile_id, username = validate(data)
     destination = profiles_dir / f"{profile_id}.json"
     if destination.is_symlink():
@@ -137,6 +174,15 @@ def store_profile(data: dict, profiles_dir: Path, replace: bool = False) -> tupl
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(payload) > MAX_BYTES:
         raise ImportRejected("profile is too large after normalization")
+
+    if replace and destination.exists():
+        try:
+            existing_data = json.loads(destination.read_text(encoding="utf-8-sig"))
+        except (UnicodeError, json.JSONDecodeError, OSError):
+            existing_data = {}
+        if isinstance(existing_data, dict) and is_headless_profile(existing_data):
+            raise ImportRejected("cannot overwrite a server headless profile")
+        _backup_existing(destination, profiles_dir)
 
     fd, temporary_name = tempfile.mkstemp(prefix=f".{profile_id}.", suffix=".tmp", dir=profiles_dir)
     temporary = Path(temporary_name)

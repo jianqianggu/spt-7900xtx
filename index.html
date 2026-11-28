@@ -14,14 +14,15 @@
       line-height: 1.55;
     }
     main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
-    h1, h2 { font-weight: 600; line-height: 1.2; }
+    h1, h2, h3 { font-weight: 600; line-height: 1.2; }
     h1 { font-size: 2rem; margin-bottom: 0.4rem; }
     h2 { font-size: 1.25rem; margin-top: 2.2rem; }
+    h3 { font-size: 1.05rem; margin-top: 1.3rem; margin-bottom: 0.4rem; }
     p, li { font-size: 1.05rem; }
     a { color: #f0c36a; }
     code, .addr {
       font-family: Consolas, "Courier New", monospace;
-      font-size: 0.95rem;
+      font-size: 0.92rem;
     }
     .addr {
       display: block;
@@ -37,6 +38,45 @@
       background: #2a2218;
       border-left: 4px solid #c9842a;
     }
+    .breaking-banner {
+      margin: 1rem 0 1.2rem;
+      padding: 0.95rem 1.1rem;
+      background: #351b17;
+      border: 1px solid #a84232;
+      border-left: 5px solid #e35d48;
+      border-radius: 6px;
+    }
+    .breaking-banner strong { color: #ffd4cc; }
+    .breaking-banner p { margin: 0.35rem 0; }
+    .badge {
+      display: inline-block;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.12rem 0.45rem;
+      border-radius: 4px;
+      margin-right: 0.45rem;
+      vertical-align: middle;
+      letter-spacing: 0.03em;
+    }
+    .badge-breaking { background: #a83324; color: #fff0ed; }
+    .badge-info { background: #4a3a1e; color: #f7dba0; }
+    .meta {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.88rem;
+      color: #d6c5a0;
+      word-break: break-all;
+    }
+    .update-list { list-style: none; padding-left: 0; }
+    .update-item {
+      margin: 0.85rem 0;
+      padding: 0.75rem 0.9rem;
+      background: #211c14;
+      border: 1px solid #4d3d20;
+      border-radius: 6px;
+    }
+    .update-item.is-breaking { border-color: #8f3a2c; }
+    .update-item p { margin: 0.35rem 0; font-size: 0.98rem; }
     form { margin: 1rem 0 0.6rem; }
     input[type="file"] { display: block; margin-bottom: 0.8rem; }
     button {
@@ -69,18 +109,26 @@
 <body>
   <main>
     <h1>SPT server</h1>
+
+    <section id="breaking-banner" class="breaking-banner" aria-live="polite">
+      <p><span class="badge badge-breaking">BREAKING</span> <strong id="breaking-title">2026-11-28 (Pack 2026-11-28.1): Mod verification enabled &amp; Dynamic Maps updated to 1.3.0</strong></p>
+      <p id="breaking-summary">Fika server-side mod verification is active, and Dynamic Maps updated to 1.3.0 (including two Unity Managed DLLs). Outdated or missing required mods are cleanly blocked at launch instead of crashing in-raid.</p>
+      <p id="breaking-action"><strong>Action required:</strong> Re-download <code>client-mods.zip</code> (Pack <code>2026-11-28.1</code>) and extract it into your SPT folder before launching.</p>
+    </section>
+
     <p id="server-status" class="note" role="status">Checking the server…</p>
     <p>On Tailscale, open <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/">jianq-7900xtx.tail4219b.ts.net:6970</a> and accept the certificate. That page checks the game. On the home network the same page is <a href="https://192.168.0.12:6970/">192.168.0.12:6970</a>. Port 6969 is only the game.</p>
+
     <h2>Online now</h2>
     <ul id="online-players"><li>Checking who is connected…</li></ul>
     <p><button id="status-refresh" type="button">Check again</button></p>
-    <p>Shared SPT 4.1.6 server for invited players. Bring the profile you already play, then join from the SPT launcher.</p>
+    <p>Shared SPT 4.1.6 server for invited players. Bring the profile you already play, then join from the SPT launcher. The launcher shows the current mod pack tag in the server name: <code id="server-name-tag">7900XTX SPT 4.1.6 (Pack 2026-11-28.1)</code>.</p>
 
     <h2>What you need installed</h2>
     <ul>
       <li>Escape from Tarkov <code>0.16.9.5.40743</code></li>
       <li>SPT <code>4.1.6</code></li>
-      <li>The compiled client mod pack below, extracted into that SPT folder</li>
+      <li>The compiled client mod pack below (<code id="pack-version-inline">Pack 2026-11-28.1</code>), extracted into that SPT folder</li>
     </ul>
 
     <h2>Connect</h2>
@@ -94,8 +142,8 @@
     <h2>Bring your own profile</h2>
     <ol>
       <li>Install SPT, then extract the client mod pack below into that folder. Start your own SPT once so the profile is saved, then close your local server and the game.</li>
-      <li>Connect Tailscale. Profile import is <code>jianq-7900xtx.tail4219b.ts.net:6970</code>, not the game port <code>6969</code>. The first time, <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/health">open the import connection</a> and accept the certificate. Then choose your own file from <code>SPT/user/profiles</code>. The file name is your profile id. Leave every other file there.</li>
-      <li>After the page confirms the import, wait about a minute. The game server reloads so it can see the new profile.</li>
+      <li>Connect Tailscale. Profile import is <code>jianq-7900xtx.tail4219b.ts.net:6970</code>, not the game port <code>6969</code>. The first time, <a class="health-link" href="https://jianq-7900xtx.tail4219b.ts.net:6970/health">open the import connection</a> and accept the certificate. Then choose your own file from <code>SPT/user/profiles</code>. The file name is your profile id. Leave every other file there.</li>
+      <li>After the page confirms the import, wait about a minute. The game server reloads so it can see the new profile. Imports are blocked while anyone is in an active raid so ongoing raids are never interrupted.</li>
       <li>Open the launcher, select this server, and log in with the same username. SPT 4.1 identifies a profile by username, so keep that name private.</li>
     </ol>
     <form id="import-form">
@@ -103,7 +151,7 @@
       <button type="submit">Import profile</button>
     </form>
     <p id="import-result" role="status"></p>
-    <p>The file goes from your browser to the server over Tailscale. It is not stored on GitHub. If that same profile is already on the server, the page asks before replacing the saved file. An upload still cannot take a username that belongs to a different profile.</p>
+    <p>The file goes from your browser to the server over Tailscale. It is not stored on GitHub. If that same profile is already on the server, the page asks before replacing the saved file (and keeps a server-side backup of the previous file). An upload still cannot take a username that belongs to a different profile. If your profile contains items or traders from mods not installed on this server, SPT automatically strips those orphaned entries on load so your profile still boots cleanly.</p>
     <p>After the profile is on the server, play it here only. Running the same profile on your own server at the same time will split your progress.</p>
 
     <h2>Download your latest profile</h2>
@@ -115,18 +163,44 @@
     </form>
     <p id="download-result" role="status"></p>
 
-    <h2>Client mod pack</h2>
-    <p>This is the compiled client set that matches the server. Install SPT 4.1.6 first, close the game, and extract the zip into the SPT folder so it merges with <code>BepInEx</code>. Leave your <code>user</code> folder alone. Server-only mods already run on the host.</p>
-    <p>The pack is on the server, not on GitHub. Connect Tailscale, <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/health">accept the certificate</a>, then download it.</p>
-    <p><a href="https://jianq-7900xtx.tail4219b.ts.net:6970/client-mods.zip">Download the client mod pack</a></p>
-    <ul>
-      <li>Fika 2.4.6</li>
-      <li>SAIN 4.5.1, with BigBrain 1.5.0, Waypoints 1.9.0, and Questing Bots 1.2.0</li>
-      <li>Looting Bots 1.8.1 and Dynamic Maps 1.3.0</li>
-      <li>Borkel's Realistic Night Vision 3.0.3</li>
-      <li>WTT Armory 2.0.5, WTT Content Backport 2.0.2, and WTT Client Common Lib 3.0.6</li>
-      <li>UI Fixes 6.0.2, Weapon Customizer 4.0.0, Gilded Key Storage 2.1.1, Barter Item Stacks 1.4.3</li>
-      <li>Bot Placement System, Battle Ambience 2.4.0, Amand's Sense 3.1.0, Menu Overhaul 1.3.0, Hitmarker 4.1.0, Quest Tracker 1.7.0, Time and Weather Changer 2.7.0, and the smaller client plugins in the zip</li>
+    <h2>Hosting a raid</h2>
+    <p id="headless-status" class="note">Standalone player-hosted raids are always available: leave <strong>Use Headless Host</strong> unticked to host on your own PC.</p>
+    <p>When a headless raid host is online, you can tick <strong>Use Headless Host</strong> on the raid screen so everyone connects as a client. When no headless client is online (or one is already busy), leave it unticked and host normally on your PC.</p>
+
+    <h2>Client mod pack &amp; mismatch protection</h2>
+    <p>This is the compiled client set that matches the server. Install SPT 4.1.6 first, close the game, and extract the zip into the SPT folder so it merges with <code>BepInEx</code> and <code>EscapeFromTarkov_Data\Managed</code>. Leave your <code>user</code> folder alone. Server-only mods already run on the host.</p>
+    <p>The pack is on the server, not on GitHub. Connect Tailscale, <a class="health-link" href="https://jianq-7900xtx.tail4219b.ts.net:6970/health">accept the certificate</a>, then download it.</p>
+    <p><a id="mod-pack-link" href="https://jianq-7900xtx.tail4219b.ts.net:6970/client-mods.zip">Download the client mod pack</a></p>
+    <p id="pack-meta" class="meta">Pack 2026-11-28.1</p>
+
+    <h3>If you see "Your client doesn't meet server requirements"</h3>
+    <p>Fika checks your loaded plugins and DLL hashes at login so mismatched mods fail cleanly at the menu instead of crashing or desyncing a raid. If you see that screen:</p>
+    <ol>
+      <li>Open <code>SPT\BepInEx\LogOutput.log</code> and search for <code>FikaModHandler</code>. It lists exact <code>missing required</code>, <code>forbidden</code>, or <code>mismatched</code> mod GUIDs.</li>
+      <li>Remove any extra plugins not listed under Required or Optional below.</li>
+      <li>Re-download the current client mod pack above and extract it cleanly over your SPT folder (delete old <code>BepInEx\plugins\mpstark-dynamicmaps</code> if upgrading from 1.2.1).</li>
+    </ol>
+
+    <h3>Required client mods (must be installed)</h3>
+    <ul id="required-mods">
+      <li>SPT 4.1.6 core plugins and Fika 2.4.6</li>
+      <li>SAIN 4.5.1, BigBrain 1.5.0, Waypoints 1.9.0, Questing Bots 1.2.0 + Fika Sync, Looting Bots 1.8.1, Bot Placement System 2.1.0</li>
+      <li>WTT Armory 2.0.5, WTT Content Backport 2.0.2, WTT Client Common Lib 3.0.6, Barter Item Stacks 1.4.3, Gilded Key Storage 2.1.1</li>
+    </ul>
+
+    <h3>Optional client mods (included in pack; safe to remove or disable)</h3>
+    <ul id="optional-mods">
+      <li>Dynamic Maps 1.3.0, Borkel's Realistic NVG 3.0.3, UI Fixes 6.0.2, Weapon Customizer 4.0.0</li>
+      <li>Amand's Sense 3.1.0, Battle Ambience 2.4.0, Menu Overhaul 1.3.0, Hitmarker 4.1.0, Quest Tracker 1.7.0, Time and Weather Changer 2.7.0, Skipper 1.1.5, Let Me Right Click 1.1.1, Plant Time Modifier 1.5.0, Trader Scrolling 4.0.0, Change Version Label 1.1.0</li>
+    </ul>
+
+    <h2>Server updates &amp; breaking changes</h2>
+    <p>Breaking changes require re-downloading the client mod pack before launching. Always check that the pack tag here matches the server name shown in the SPT Launcher.</p>
+    <ul id="updates-list" class="update-list">
+      <li class="update-item is-breaking">
+        <p><span class="badge badge-breaking">BREAKING</span> <strong>2026-11-28 — Pack 2026-11-28.1</strong></p>
+        <p>Mod verification enabled &amp; Dynamic Maps updated to 1.3.0.</p>
+      </li>
     </ul>
 
     <h2>How access is limited</h2>
@@ -134,9 +208,9 @@
       <li>The game port is for Tailscale members and the home LAN. It is not published to the internet from this setup.</li>
       <li>The server web admin login is a separate password, works from the server itself, and is not written on this page.</li>
       <li>Profile files, server configs, and API keys stay off this website.</li>
-      <li>The import page only accepts a profile from this website, and only while you are on Tailscale. Another website cannot submit one through your browser.</li>
-      <li>Replacing a profile asks for confirmation first, and only rewrites that same profile file. It cannot take a username that belongs to a different profile.</li>
-      <li>The download box lists usernames already on the server so you can pick yours. The file it returns is only the profile for the name you choose.</li>
+      <li>The import page only accepts a profile from this website, and only while you are on Tailscale or the home LAN. Another website cannot submit one through your browser.</li>
+      <li>Replacing a profile asks for confirmation first, backs up the previous copy on the server, and only rewrites that same profile file. It cannot take a username that belongs to a different profile, and imports are refused while anyone is in an active raid.</li>
+      <li>The download box lists player usernames already on the server so you can pick yours. The file it returns is only the profile for the name you choose.</li>
       <li>Online now shows the nickname of someone connected at the moment. It does not list saved profiles or profile files.</li>
       <li>The client mod pack is a direct file on the Tailscale address. It is not published from this website.</li>
     </ul>
@@ -151,9 +225,115 @@
     };
     const statusNode = document.getElementById("server-status");
     const onlineList = document.getElementById("online-players");
+    const headlessNode = document.getElementById("headless-status");
+    const packMetaNode = document.getElementById("pack-meta");
+    const packVersionInline = document.getElementById("pack-version-inline");
+    const serverNameTag = document.getElementById("server-name-tag");
+    const updatesList = document.getElementById("updates-list");
+    const requiredModsList = document.getElementById("required-mods");
+    const optionalModsList = document.getElementById("optional-mods");
+    const breakingBanner = document.getElementById("breaking-banner");
+    const breakingTitle = document.getElementById("breaking-title");
+    const breakingSummary = document.getElementById("breaking-summary");
+    const breakingAction = document.getElementById("breaking-action");
+
+    if (onServer) {
+      const modPackLink = document.getElementById("mod-pack-link");
+      if (modPackLink) modPackLink.href = "/client-mods.zip";
+      document.querySelectorAll(".health-link").forEach((link) => {
+        link.href = "/health";
+      });
+    }
+
     const unreachable = onServer
       ? "The status service on this page did not answer. Reload after accepting the certificate."
-      : "This public page cannot check the game. On Tailscale open https://jianq-7900xtx.tail4219b.ts.net:6970/ and accept the certificate. Port 6969 is the game.";
+      : "This public page cannot check the live game status. On Tailscale open https://jianq-7900xtx.tail4219b.ts.net:6970/ and accept the certificate. Port 6969 is the game.";
+
+    function renderBreakingBanner(entry) {
+      if (!entry || typeof entry.title !== "string") {
+        breakingBanner.hidden = true;
+        return;
+      }
+      breakingBanner.hidden = false;
+      const prefix = [entry.date, entry.packVersion ? "Pack " + entry.packVersion : ""].filter(Boolean).join(" — ");
+      breakingTitle.textContent = (prefix ? prefix + ": " : "") + entry.title;
+      breakingSummary.textContent = entry.summary || "";
+      breakingAction.textContent = entry.action ? "Action required: " + entry.action : "";
+    }
+
+    function renderModList(target, items) {
+      if (!Array.isArray(items) || items.length === 0) return;
+      target.replaceChildren();
+      items.forEach((mod) => {
+        if (!mod || typeof mod.name !== "string") return;
+        const li = document.createElement("li");
+        li.textContent = mod.name + (mod.version ? " " + mod.version : "") + " ";
+        if (typeof mod.guid === "string" && mod.guid) {
+          const code = document.createElement("code");
+          code.textContent = "(" + mod.guid + ")";
+          li.append(code);
+        }
+        target.append(li);
+      });
+    }
+
+    function renderUpdates(updates) {
+      if (!Array.isArray(updates) || updates.length === 0) return;
+      updatesList.replaceChildren();
+      updates.forEach((entry) => {
+        if (!entry || typeof entry.title !== "string") return;
+        const li = document.createElement("li");
+        li.className = "update-item" + (entry.breaking ? " is-breaking" : "");
+
+        const header = document.createElement("p");
+        const badge = document.createElement("span");
+        badge.className = "badge " + (entry.breaking ? "badge-breaking" : "badge-info");
+        badge.textContent = entry.breaking ? "BREAKING" : "UPDATE";
+        const strong = document.createElement("strong");
+        const meta = [entry.date, entry.packVersion ? "Pack " + entry.packVersion : ""].filter(Boolean).join(" — ");
+        strong.textContent = (meta ? meta + ": " : "") + entry.title;
+        header.append(badge, strong);
+        li.append(header);
+
+        if (typeof entry.summary === "string" && entry.summary) {
+          const summary = document.createElement("p");
+          summary.textContent = entry.summary;
+          li.append(summary);
+        }
+        if (typeof entry.action === "string" && entry.action) {
+          const action = document.createElement("p");
+          action.textContent = (entry.breaking ? "Action required: " : "Note: ") + entry.action;
+          li.append(action);
+        }
+        updatesList.append(li);
+      });
+    }
+
+    async function loadServerUpdates() {
+      try {
+        const response = await fetch("./server-updates.json", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (typeof data.packVersion === "string") {
+          packVersionInline.textContent = "Pack " + data.packVersion;
+          packMetaNode.textContent = "Pack " + data.packVersion;
+        }
+        if (typeof data.serverName === "string") {
+          serverNameTag.textContent = data.serverName;
+        }
+        if (Array.isArray(data.updates)) {
+          renderUpdates(data.updates);
+          const latestBreaking = data.updates.find((item) => item && item.breaking === true);
+          renderBreakingBanner(latestBreaking || null);
+        }
+        if (data.mods) {
+          renderModList(requiredModsList, data.mods.required);
+          renderModList(optionalModsList, data.mods.optional);
+        }
+      } catch (error) {
+        // Fallback static HTML stays visible.
+      }
+    }
 
     function renderPlayers(payload) {
       onlineList.replaceChildren();
@@ -181,6 +361,39 @@
       });
     }
 
+    function renderHeadlessStatus(payload) {
+      if (!payload || payload.spt !== "up" || !payload.headlessAvailable) {
+        headlessNode.textContent = "Standalone player-hosted raids work whenever the server is up: leave Use Headless Host unticked to host on your own PC.";
+        return;
+      }
+      if (payload.headlessCount > 0) {
+        headlessNode.textContent = payload.headlessCount + " headless raid host online right now. Tick Use Headless Host to use it, or leave it unticked to host standalone.";
+      } else {
+        headlessNode.textContent = "No headless raid host is online right now (0 available). Leave Use Headless Host unticked to host raids standalone on your own PC.";
+      }
+    }
+
+    function renderPackMeta(payload) {
+      if (!payload) return;
+      const parts = [];
+      if (typeof payload.packVersion === "string" && payload.packVersion) {
+        parts.push("Pack " + payload.packVersion);
+        packVersionInline.textContent = "Pack " + payload.packVersion;
+      }
+      if (typeof payload.packSize === "number" && payload.packSize > 0) {
+        parts.push((payload.packSize / (1024 * 1024)).toFixed(1) + " MB");
+      }
+      if (typeof payload.packSha256 === "string" && payload.packSha256) {
+        parts.push("SHA-256 " + payload.packSha256.slice(0, 16) + "…");
+      }
+      if (parts.length > 0) {
+        packMetaNode.textContent = parts.join(" · ");
+      }
+      if (payload.latestBreaking) {
+        renderBreakingBanner(payload.latestBreaking);
+      }
+    }
+
     async function refreshStatus(manual) {
       if (manual) statusNode.textContent = "Checking the server…";
       try {
@@ -189,19 +402,25 @@
         if (!response.ok || !payload.ok) {
           statusNode.textContent = payload.error || "Status check failed.";
           renderPlayers(null);
+          renderHeadlessStatus(null);
           return;
         }
         const version = payload.version && payload.version !== "unknown" ? "SPT " + payload.version : "SPT";
+        const packTag = payload.packVersion ? " · Pack " + payload.packVersion : "";
         statusNode.textContent = payload.spt === "up"
-          ? version + " is up."
+          ? version + " is up" + packTag + "."
           : version + " is not accepting players right now.";
         renderPlayers(payload);
+        renderHeadlessStatus(payload);
+        renderPackMeta(payload);
       } catch (error) {
         statusNode.textContent = unreachable;
         renderPlayers(null);
+        renderHeadlessStatus(null);
       }
     }
 
+    loadServerUpdates();
     document.getElementById("status-refresh").addEventListener("click", () => refreshStatus(true));
     refreshStatus(true);
     setInterval(() => refreshStatus(false), 20000);

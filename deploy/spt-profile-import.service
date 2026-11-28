@@ -13,6 +13,7 @@ Environment=SPT_TLS_CERT=%h/spt/certs/import.crt
 Environment=SPT_TLS_KEY=%h/spt/certs/import.key
 Environment=SPT_ALLOWED_ORIGIN=https://jianqianggu.github.io,https://jianq-7900xtx.tail4219b.ts.net:6970,https://192.168.0.12:6970
 Environment=SPT_PAGE_FILE=%h/spt/www/index.html
+Environment=SPT_MANIFEST_FILE=%h/spt/www/server-updates.json
 Environment=SPT_CLIENT_MOD_PACK=%h/spt/client-mods/spt-7900xtx-client-mods.zip
 Restart=on-failure
 RestartSec=5
