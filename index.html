@@ -70,7 +70,7 @@
   <main>
     <h1>SPT server</h1>
     <p id="server-status" class="note" role="status">Checking the server…</p>
-    <p>On this home network, open <a href="https://192.168.0.12:6970/">192.168.0.12:6970</a> and accept the certificate. That page checks the game. Use <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/">the Tailscale address</a> when Tailscale is connected. Port 6969 is only the game.</p>
+    <p>On Tailscale, open <a href="https://jianq-7900xtx.tail4219b.ts.net:6970/">jianq-7900xtx.tail4219b.ts.net:6970</a> and accept the certificate. That page checks the game. On the home network the same page is <a href="https://192.168.0.12:6970/">192.168.0.12:6970</a>. Port 6969 is only the game.</p>
     <h2>Online now</h2>
     <ul id="online-players"><li>Checking who is connected…</li></ul>
     <p><button id="status-refresh" type="button">Check again</button></p>
@@ -153,7 +153,7 @@
     const onlineList = document.getElementById("online-players");
     const unreachable = onServer
       ? "The status service on this page did not answer. Reload after accepting the certificate."
-      : "This public page cannot check the game. On the home network open https://192.168.0.12:6970/ and accept the certificate. Port 6969 is the game.";
+      : "This public page cannot check the game. On Tailscale open https://jianq-7900xtx.tail4219b.ts.net:6970/ and accept the certificate. Port 6969 is the game.";
 
     function renderPlayers(payload) {
       onlineList.replaceChildren();

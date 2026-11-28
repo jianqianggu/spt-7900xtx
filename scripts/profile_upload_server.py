@@ -237,6 +237,10 @@ class ImportHandler(BaseHTTPRequestHandler):
     def _origin_ok(self) -> bool:
         return self._request_origin() != ""
 
+    def _on_tailnet_or_lan(self) -> bool:
+        ip = _client_ip(self)
+        return ip.startswith("100.") or ip.startswith("192.168.")
+
     def do_OPTIONS(self) -> None:
         if not self._origin_ok():
             self._json(403, {"ok": False, "error": "this upload only accepts the connect page"})
@@ -338,7 +342,7 @@ class ImportHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _usernames(self) -> None:
-        if not self._page_request():
+        if not self._page_request() and not self._on_tailnet_or_lan():
             self._json(403, {"ok": False, "error": "this page only accepts the connect page"})
             return
         try:
@@ -365,7 +369,7 @@ class ImportHandler(BaseHTTPRequestHandler):
         if path != "/status":
             self._json(404, {"ok": False, "error": "not found"})
             return
-        if not self._page_request():
+        if not self._page_request() and not self._on_tailnet_or_lan():
             self._json(403, {"ok": False, "error": "this page only accepts the connect page"})
             return
         self._json(200, _server_status())
