@@ -30,7 +30,11 @@ from profile_import import (
     store_profile,
 )
 
-BIND_HOST = os.environ.get("SPT_BIND_HOST", "100.64.91.97")
+BIND_HOSTS = [
+    host.strip()
+    for host in os.environ.get("SPT_BIND_HOST", "100.64.91.97,192.168.0.12").split(",")
+    if host.strip()
+]
 PORT = int(os.environ.get("SPT_IMPORT_PORT", "6970"))
 PROFILES_DIR = Path(os.environ.get("SPT_PROFILES_DIR", "/home/jianqianggu/spt/user/profiles"))
 CERT_FILE = Path(os.environ.get("SPT_TLS_CERT", "/home/jianqianggu/spt/certs/import.crt"))
@@ -39,7 +43,7 @@ ALLOWED_ORIGINS = {
     origin.strip()
     for origin in os.environ.get(
         "SPT_ALLOWED_ORIGIN",
-        "https://jianqianggu.github.io,https://jianq-7900xtx.tail4219b.ts.net:6970",
+        "https://jianqianggu.github.io,https://jianq-7900xtx.tail4219b.ts.net:6970,https://192.168.0.12:6970",
     ).split(",")
     if origin.strip()
 }
@@ -432,20 +436,31 @@ class ImportHandler(BaseHTTPRequestHandler):
         )
 
 
-def main() -> None:
-    if not BIND_HOST.startswith("100."):
-        raise SystemExit("refusing to listen outside the Tailscale address range")
-    if not CERT_FILE.is_file() or not KEY_FILE.is_file():
-        raise SystemExit("import certificate is missing")
-    server = ThreadingHTTPServer((BIND_HOST, PORT), ImportHandler)
+def _bind_allowed(host: str) -> bool:
+    return host.startswith("100.") or host.startswith("192.168.")
+
+
+def _serve(host: str) -> None:
     import ssl
 
+    server = ThreadingHTTPServer((host, PORT), ImportHandler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(CERT_FILE, KEY_FILE)
     server.socket = context.wrap_socket(server.socket, server_side=True)
-    print(f"profile import listening on https://{BIND_HOST}:{PORT}", flush=True)
+    print(f"profile import listening on https://{host}:{PORT}", flush=True)
     server.serve_forever()
+
+
+def main() -> None:
+    if not BIND_HOSTS or any(not _bind_allowed(host) for host in BIND_HOSTS):
+        raise SystemExit("refusing to listen outside the home network and Tailscale")
+    if not CERT_FILE.is_file() or not KEY_FILE.is_file():
+        raise SystemExit("import certificate is missing")
+    threads = [threading.Thread(target=_serve, args=(host,), daemon=True) for host in BIND_HOSTS]
+    for thread in threads:
+        thread.start()
+    threads[0].join()
 
 
 if __name__ == "__main__":
